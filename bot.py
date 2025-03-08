@@ -1,117 +1,117 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters, CallbackQueryHandler
-import logging
-import requests
-import os
 import random
-from datetime import datetime, timedelta
-from dotenv import load_dotenv
+import datetime
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# ✅ LOGGING SETUP
-logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
+# Temporary database
+users = {}
 
-# ✅ BOT SETTINGS
-CHANNEL_USERNAME = "@referearn01g"
-ADMIN_ID = 123456789
-users_data = {}
-spin_data = {}
+# Bot Token (Replace with your actual bot token)
+TOKEN = "8029651365:AAHhrgJvYf196eK8Hla2FFQ1GYAg87waqZY"
 
-# ✅ FUNCTION: Check if user has joined the channel
-def is_user_subscribed(user_id, bot_token):
-    url = f"https://api.telegram.org/bot{bot_token}/getChatMember?chat_id={CHANNEL_USERNAME}&user_id={user_id}"
-    response = requests.get(url).json()
-    status = response.get("result", {}).get("status", "")
-    return status in ["member", "administrator", "creator"]
-
-# ✅ FUNCTION: Start Command
-async def start(update: Update, context: CallbackContext):
+# Start Command
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.chat_id
-    bot_token = context.bot.token
-
-    if not is_user_subscribed(user_id, bot_token):
-        keyboard = [
-            [InlineKeyboardButton("🔔 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME}")],
-            [InlineKeyboardButton("✅ Check Subscription", callback_data="check_subscription")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("🚨 Please Join Our Channel", reply_markup=reply_markup)
-        return
-
-    referral_link = f"https://t.me/YOUR_BOT_USERNAME?start={user_id}"
-    users_data.setdefault(user_id, {"balance": 0, "referrals": 0})
+    if user_id not in users:
+        users[user_id] = {
+            "balance": 0, 
+            "referrals": 0, 
+            "bonus": 0, 
+            "last_bonus": None, 
+            "last_spin": None, 
+            "referral_link": f"https://t.me/YOUR_BOT_USERNAME?start={user_id}"
+        }
+    
     keyboard = [
         [InlineKeyboardButton("💰 Check Balance", callback_data="balance")],
-        [InlineKeyboardButton("👥 My Referral Link", callback_data="referral")],
-        [InlineKeyboardButton("🎁 Daily Bonus", callback_data="daily_bonus")],
-        [InlineKeyboardButton("🎡 Spin & Win", callback_data="spin")],
-        [InlineKeyboardButton("🏆 Referral Stats", callback_data="stats")],
-        [InlineKeyboardButton("💳 Withdraw", callback_data="withdraw")]
+        [InlineKeyboardButton("💵 Withdraw", callback_data="withdraw")],
+        [InlineKeyboardButton("🔗 Refer & Earn", callback_data="referral")],
+        [InlineKeyboardButton("🎁 Daily Bonus", callback_data="bonus")],
+        [InlineKeyboardButton("🎡 Spin & Win", callback_data="spin")],  # Spin button added
+        [InlineKeyboardButton("📜 Help", callback_data="help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(f"🎉 Welcome {update.message.chat.first_name}!", reply_markup=reply_markup)
+    
+    welcome_message = (
+        "✨ *Welcome to the Referral Bot!* ✨\n\n"
+        "🎯 *Earn ₹5 per referral!*\n"
+        "💸 *Withdraw once you reach ₹50!*\n"
+        "🎁 *Claim ₹2 daily bonus!*\n"
+        "🎡 *Try your luck with Spin & Win!*\n\n"
+        f"📌 Your Referral Link: {users[user_id]['referral_link']}\n\n"
+        "Use the buttons below to explore!"
+    )
+    await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode="Markdown")
 
-# ✅ FUNCTION: Button Handler
-async def button_handler(update: Update, context: CallbackContext):
+# Callback Query Handler
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.message.chat_id
+    await query.answer()
     
     if query.data == "balance":
-        balance = users_data[user_id]["balance"]
-        await query.edit_message_text(f"💰 Your Balance: ₹{balance}")
-    
-    elif query.data == "referral":
-        referral_link = f"https://t.me/YOUR_BOT_USERNAME?start={user_id}"
-        await query.edit_message_text(f"🔗 Your Referral Link:\n{referral_link}")
-    
-    elif query.data == "daily_bonus":
-        users_data[user_id]["balance"] += 2
-        await query.edit_message_text(f"🎉 You received ₹2 daily bonus!\n💰 New Balance: ₹{users_data[user_id]['balance']}")
-    
+        await query.edit_message_text(
+            f"💰 *Your Balance:* ₹{users[user_id]['balance']}\n"
+            f"👥 *Total Referrals:* {users[user_id]['referrals']}\n"
+            f"🎁 *Daily Bonus Earned:* ₹{users[user_id]['bonus']}",
+            parse_mode="Markdown"
+        )
     elif query.data == "withdraw":
-        if users_data[user_id]["balance"] >= 50:
-            await context.bot.send_message(ADMIN_ID, f"💰 Withdrawal Request! User: {user_id}, Amount: ₹50")
-            users_data[user_id]["balance"] -= 50
-            await query.edit_message_text("✅ Withdrawal request sent!")
+        if users[user_id]['balance'] >= 50:
+            users[user_id]['balance'] -= 50
+            await query.edit_message_text("✅ *Withdrawal of ₹50 successful!*", parse_mode="Markdown")
         else:
-            await query.edit_message_text("❌ Minimum ₹50 required for withdrawal!")
-    
-    elif query.data == "stats":
-        referrals = users_data[user_id]["referrals"]
-        await query.edit_message_text(f"🏆 You have referred {referrals} people!")
-    
+            await query.edit_message_text("⚠️ *Minimum ₹50 required for withdrawal.*", parse_mode="Markdown")
+    elif query.data == "referral":
+        await query.edit_message_text(
+            f"🔗 *Refer & Earn ₹5 per referral!*\n\n📌 Your Referral Link: {users[user_id]['referral_link']}",
+            parse_mode="Markdown"
+        )
+    elif query.data == "bonus":
+        today = datetime.date.today()
+        if users[user_id]['last_bonus'] != today:
+            users[user_id]['bonus'] += 2  # Daily bonus amount
+            users[user_id]['balance'] += 2
+            users[user_id]['last_bonus'] = today
+            await query.edit_message_text("🎉 *You received ₹2 as a daily bonus!*", parse_mode="Markdown")
+        else:
+            await query.edit_message_text("⚠️ *You have already claimed your daily bonus today.*", parse_mode="Markdown")
     elif query.data == "spin":
-        now = datetime.now()
-        last_spin = spin_data.get(user_id, None)
-        if last_spin and now - last_spin < timedelta(hours=24):
-            await query.edit_message_text("❌ You can spin only once every 24 hours!")
-        else:
-            spin_data[user_id] = now
-            reward = random.randint(1, 10)
-            users_data[user_id]["balance"] += reward
-            await query.edit_message_text(f"🎡 You spun the wheel and won ₹{reward}!\n💰 New Balance: ₹{users_data[user_id]['balance']}")
+        await spin_task(query, user_id)
+    elif query.data == "help":
+        await query.edit_message_text(
+            "📜 *Help Menu*\n\n"
+            "💰 *Check Balance* - View your earnings.\n"
+            "💵 *Withdraw* - Withdraw money (Min ₹50).\n"
+            "🔗 *Refer & Earn* - Get your referral link.\n"
+            "🎁 *Daily Bonus* - Claim ₹2 bonus daily.\n"
+            "🎡 *Spin & Win* - Win up to ₹10 daily.\n\n"
+            "For any issues, contact support.",
+            parse_mode="Markdown"
+        )
 
-# ✅ FUNCTION: Handle New Users from Referrals
-async def handle_new_user(update: Update, context: CallbackContext):
-    args = context.args
-    new_user_id = update.message.chat_id
+# Spin Task Function
+async def spin_task(query, user_id):
+    today = datetime.date.today()
+    
+    if users[user_id]['last_spin'] == today:
+        await query.edit_message_text("⚠️ *You have already used your spin today. Try again tomorrow!*", parse_mode="Markdown")
+        return
+    
+    spin_amount = random.randint(1, 10)  # Random win between ₹1 and ₹10
+    users[user_id]['balance'] += spin_amount
+    users[user_id]['last_spin'] = today
 
-    if args:
-        referrer_id = int(args[0])
-        if referrer_id != new_user_id and referrer_id in users_data:
-            users_data[referrer_id]["balance"] += 5
-            users_data[referrer_id]["referrals"] += 1
-            await update.message.reply_text("🎉 You joined using a referral link!")
-            await context.bot.send_message(referrer_id, f"🎊 New Referral! You earned ₹5.\n💰 New Balance: ₹{users_data[referrer_id]['balance']}")
+    await query.edit_message_text(f"🎡 *Spin Result:* You won ₹{spin_amount}! 🎉\n\n💰 *New Balance:* ₹{users[user_id]['balance']}", parse_mode="Markdown")
 
-# ✅ MAIN FUNCTION
+# Main Function
 def main():
-    load_dotenv()
-    TOKEN = os.getenv("8029651365:AAERRlXGO9Ekpsrm0wx2P-Bk46ylaVp23Ys")
     app = Application.builder().token(TOKEN).build()
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_new_user))
-    print("🤖 Bot is running...")
+
+    print("Bot is running...")
     app.run_polling()
 
 if __name__ == "__main__":
