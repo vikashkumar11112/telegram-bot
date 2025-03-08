@@ -1,5 +1,6 @@
 import random
 import datetime
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
@@ -7,7 +8,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 users = {}
 
 # Bot Token (Replace with your actual bot token)
-TOKEN = "8029651365:AAHhrgJvYf196eK8Hla2FFQ1GYAg87waqZY"
+TOKEN = "8029651365:AAFBS-wviNLKfbDeBWXXuucTBAEFauyQBig"
 
 # Start Command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -104,8 +105,20 @@ async def spin_task(query, user_id):
 
     await query.edit_message_text(f"🎡 *Spin Result:* You won ₹{spin_amount}! 🎉\n\n💰 *New Balance:* ₹{users[user_id]['balance']}", parse_mode="Markdown")
 
+# Function to delete webhook
+async def delete_webhook():
+    url = f"https://api.telegram.org/bot{TOKEN}/deleteWebhook"
+    response = requests.get(url)
+    if response.status_code == 200:
+        print("Webhook deleted successfully!")
+    else:
+        print("Error deleting webhook:", response.json())
+
 # Main Function
 def main():
+    # Delete any existing webhook first
+    delete_webhook()
+    
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
