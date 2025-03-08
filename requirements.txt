@@ -1,6 +1,3 @@
 python-telegram-bot
-requests
-python-telegram-bot
-requests
 pytz
 asyncio
