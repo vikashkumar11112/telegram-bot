@@ -1,3 +1,3 @@
-python-telegram-bot
-pytz
-asyncio
+python-telegram-bot==20.0
+pytz==2024.1
+asyncio==3.4.3
