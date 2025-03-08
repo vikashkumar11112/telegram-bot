@@ -108,7 +108,7 @@ def handle_new_user(update: Update, context: CallbackContext):
 
 # ✅ MAIN FUNCTION
 def main():
-    TOKEN = "8029651365:AAHsOFctfxcNuCk85_ph1sJf61uwO_kr504"
+    TOKEN = "8029651365:AAFmQY4fYcL9bPYPQKIMI1JfaZsfQR_-Asg"
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
 
